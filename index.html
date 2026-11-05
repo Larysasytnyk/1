@@ -168,7 +168,7 @@
         dirLight.position.set(10, 20, 15);
         scene.add(dirLight);
 
-        // Початкова сітка (зникне після завантаження)
+        // Початкова сітка (зникає після завантаження)
         const gridHelper = new THREE.GridHelper(30, 30, 0x4f46e5, 0x1e293b);
         gridHelper.position.y = -3;
         scene.add(gridHelper);
@@ -182,36 +182,35 @@
         const depthVal = document.getElementById('depthVal');
         depthSlider.addEventListener('input', (e) => {
             depthVal.innerText = e.target.value;
-            if (currentImage) generateVoxel3D(currentImage);
+            if (currentImage) generateDiscreteVoxels(currentImage);
         });
 
-        // Функція побудови точної воксельної 3D-моделі з високою деталізацією та повноцінним об'ємом
-        function generateVoxel3D(img) {
+        // Побудова ідеальних дискретних кубиків-точок із реальним об'ємом у глибину
+        function generateDiscreteVoxels(img) {
             while(modelGroup.children.length > 0){ 
                 modelGroup.remove(modelGroup.children[0]); 
             }
 
-            // Ховаємо фонову сітку після завантаження
-            gridHelper.visible = false;
+            gridHelper.visible = false; // прибираємо сітку
 
             const canvas2D = document.createElement('canvas');
             const ctx = canvas2D.getContext('2d');
-            const res = 70; // Висока роздільна здатність для збереження ідеальної реалістичності
+            const res = 50; // Чітка деталізація вокселів
             canvas2D.width = res;
             canvas2D.height = res;
             ctx.drawImage(img, 0, 0, res, res);
             const imgData = ctx.getImageData(0, 0, res, res).data;
 
             const maxDepth = parseInt(depthSlider.value);
-            const boxGeo = new THREE.BoxGeometry(0.08, 0.08, 0.08);
+            // Робимо кубики трохи меншими з проміжками, щоб чітко бачити структуру точок
+            const boxGeo = new THREE.BoxGeometry(0.1, 0.1, 0.1);
 
             for (let y = 0; y < res; y++) {
                 for (let x = 0; x < res; x++) {
                     const i = (y * res + x) * 4;
                     const r = imgData[i], g = imgData[i+1], b = imgData[i+2], a = imgData[i+3];
 
-                    // Відсікаємо білий або прозорий фон
-                    if (a < 40 || (r > 240 && g > 240 && b > 240)) continue;
+                    if (a < 40 || (r > 235 && g > 235 && b > 235)) continue;
 
                     const hexColor = (r << 16) | (g << 8) | b;
                     const material = new THREE.MeshStandardMaterial({ 
@@ -219,14 +218,14 @@
                         roughness: 0.35 
                     });
 
-                    // Робимо модель повноцінно об'ємною в глибину (масивність з усіх боків)
-                    const depthSteps = Math.max(3, Math.floor(maxDepth / 3));
-                    for (let z = 0; z < depthSteps; z++) {
+                    // Кількість шарів у глибину залежить від повзунка товщини
+                    const depthLayers = Math.max(3, Math.floor(maxDepth / 4));
+                    for (let z = 0; z < depthLayers; z++) {
                         const mesh = new THREE.Mesh(boxGeo, material);
                         
-                        const posX = (x - res / 2) * 0.09;
-                        const posY = (y - res / 2) * 0.09;
-                        const posZ = (z - depthSteps / 2) * 0.09;
+                        const posX = (x - res / 2) * 0.11;
+                        const posY = (y - res / 2) * 0.11;
+                        const posZ = (z - depthLayers / 2) * 0.11;
 
                         mesh.position.set(posX, posY, posZ);
                         modelGroup.add(mesh);
@@ -234,12 +233,11 @@
                 }
             }
 
-            // Модель у нормальному положенні (не перевернута)
+            // Рівне нормальне положення
             modelGroup.rotation.x = 0;
             modelGroup.rotation.z = 0;
         }
 
-        // Завантаження файлу
         document.getElementById('imageLoader').addEventListener('change', (e) => {
             const file = e.target.files[0];
             if (!file) return;
@@ -251,7 +249,7 @@
                 const img = new Image();
                 img.onload = function() {
                     currentImage = img;
-                    generateVoxel3D(img);
+                    generateDiscreteVoxels(img);
                 }
                 img.src = event.target.result;
             }
